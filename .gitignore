@@ -4,3 +4,16 @@ build/
 dist/
 *.spec
 .venv/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.idea/
+*.iml
+android/.gradle/
+android/local.properties
+android/app/.cxx/
+android/gradle-wrapper.jar
