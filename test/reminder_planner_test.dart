@@ -9,19 +9,16 @@ void main() {
   List<PlannedReminder> plan({
     List<Event> events = const [],
     List<Todo> todos = const [],
+    List<RoutineBlock> routines = const [],
     Settings? settings,
     DateTime? at,
-  }) =>
-      planReminders(
-        events: events,
-        todos: todos,
-        settings: settings ?? Settings(dailyOn: false),
-        now: at ?? now,
-      );
+  }) => planReminders(events: events, todos: todos, routines: routines, settings: settings ?? Settings(dailyOn: false), now: at ?? now);
 
   group('nhắc từng lịch', () {
     test('nhắc trước đúng số phút', () {
-      final r = plan(events: [Event(title: 'Họp', date: '2026-10-07', start: '09:00', remind: 15)]);
+      final r = plan(
+        events: [Event(title: 'Họp', date: '2026-10-07', start: '09:00', remind: 15)],
+      );
       expect(r.length, 1);
       expect(r.single.at, DateTime(2026, 10, 7, 8, 45));
       expect(r.single.title, contains('Họp'));
@@ -29,26 +26,91 @@ void main() {
     });
 
     test('nhắc đúng giờ', () {
-      final r = plan(events: [Event(title: 'A', date: '2026-10-07', start: '09:00', remind: 0)]);
+      final r = plan(
+        events: [Event(title: 'A', date: '2026-10-07', start: '09:00', remind: 0)],
+      );
       expect(r.single.at, DateTime(2026, 10, 7, 9, 0));
       expect(r.single.body, contains('bắt đầu ngay bây giờ'));
     });
 
     test('remind = null thì không nhắc; mốc đã qua thì bỏ', () {
-      expect(plan(events: [Event(title: 'A', date: '2026-10-07', start: '09:00', remind: null)]), isEmpty);
-      expect(plan(events: [Event(title: 'A', date: '2026-10-07', start: '08:05', remind: 10)]), isEmpty);
+      expect(
+        plan(
+          events: [Event(title: 'A', date: '2026-10-07', start: '09:00', remind: null)],
+        ),
+        isEmpty,
+      );
+      expect(
+        plan(
+          events: [Event(title: 'A', date: '2026-10-07', start: '08:05', remind: 10)],
+        ),
+        isEmpty,
+      );
     });
 
     test('lịch cả ngày tính từ 08:00, nhắc trước 1 ngày', () {
-      final r = plan(events: [Event(title: 'Sinh nhật', date: '2026-10-09', remind: 1440)]);
+      final r = plan(
+        events: [Event(title: 'Sinh nhật', date: '2026-10-09', remind: 1440)],
+      );
       expect(r.single.at, DateTime(2026, 10, 8, 8, 0));
     });
 
     test('lịch lặp hằng tuần sinh nhiều lần nhắc', () {
-      final r = plan(events: [Event(title: 'Gym', date: '2026-10-01', start: '18:00', repeat: Repeat.weekly, remind: 10)]);
+      final r = plan(
+        events: [Event(title: 'Gym', date: '2026-10-01', start: '18:00', repeat: Repeat.weekly, remind: 10)],
+      );
       // 7/10 là Thứ Tư; lịch gốc thứ Năm → 8/10, 15/10, 22/10, 29/10, 5/11
       expect(r.map((e) => e.at.day).take(3), [8, 15, 22]);
       expect(r.length, greaterThanOrEqualTo(4));
+    });
+  });
+
+  group('lịch cố định', () {
+    final b = RoutineBlock(title: 'Học bài', start: '09:00', end: '10:30', days: {3, 5}); // T4, T6
+
+    test('nhắc đúng giờ bắt đầu vào các ngày đã chọn', () {
+      final r = plan(routines: [b]).where((x) => x.kind == 'routine').toList();
+      expect(r.first.at, DateTime(2026, 10, 7, 9, 0)); // 7/10 là Thứ Tư
+      expect(r[1].at, DateTime(2026, 10, 9, 9, 0)); // Thứ Sáu
+      expect(r.first.title, 'Học bài');
+      expect(r.first.ongoingFor, isNull);
+      expect(r.first.body, contains('T4 · T6'));
+    });
+
+    test('tắt nhắc thì không có thông báo', () {
+      expect(plan(routines: [b.copy()..remind = false]), isEmpty);
+    });
+
+    test('ghim màn hình khóa: giữ suốt khung giờ, hiện ngay nếu đang diễn ra', () {
+      final lock = b.copy()..lockScreen = true;
+      final r = plan(routines: [lock], at: DateTime(2026, 10, 7, 9, 30));
+      expect(r.first.at, DateTime(2026, 10, 7, 9, 30, 3));
+      expect(r.first.ongoingFor, const Duration(minutes: 59, seconds: 57));
+      final next = r[1];
+      expect(next.at, DateTime(2026, 10, 9, 9, 0));
+      expect(next.ongoingFor, const Duration(minutes: 90));
+    });
+
+    test('mô tả ngày lặp', () {
+      expect(describeDays({1, 2, 3, 4, 5}), 'Thứ Hai – Thứ Sáu');
+      expect(describeDays({1, 2, 3, 4, 5, 6, 7}), 'Mỗi ngày');
+      expect(describeDays({6, 7}), 'Cuối tuần');
+      expect(describeDays({1, 3}), 'T2 · T4');
+    });
+
+    test('JSON khứ hồi', () {
+      final x = RoutineBlock.fromJson((b.copy()..lockScreen = true).toJson());
+      expect(
+        [x.title, x.start, x.end, x.days, x.lockScreen, x.remind],
+        [
+          'Học bài',
+          '09:00',
+          '10:30',
+          {3, 5},
+          true,
+          true,
+        ],
+      );
     });
   });
 
@@ -63,8 +125,9 @@ void main() {
       final daily = r.where((e) => e.kind == 'daily').toList();
       expect(daily.length, 14);
       expect(daily.first.at, DateTime(2026, 10, 7, 7, 30));
-      expect(daily.first.body, contains('1 lịch và 1 việc chưa xong'));
-      expect(daily.first.body, contains('09:00 Họp'));
+      expect(daily.first.body, contains('1 lịch, 0 khung giờ cố định và 1 việc chưa xong'));
+      expect(daily.first.lines.first, '09:00   Họp');
+      expect(daily.first.title, 'Chào buổi sáng');
     });
 
     test('giờ hôm nay đã qua thì bắt đầu từ ngày mai', () {
@@ -77,19 +140,37 @@ void main() {
     final s = Settings(dailyOn: false, intervalOn: true, intervalHours: 2, intervalFrom: '08:00', intervalTo: '22:00');
 
     test('chia theo bước giờ trong khung giờ', () {
-      final r = plan(settings: s, todos: [Todo(text: 'A'), Todo(text: 'B')], at: DateTime(2026, 10, 7, 7, 0));
+      final r = plan(
+        settings: s,
+        todos: [
+          Todo(text: 'A'),
+          Todo(text: 'B'),
+        ],
+        at: DateTime(2026, 10, 7, 7, 0),
+      );
       final today = r.where((e) => e.at.day == 7).map((e) => e.at.hour).toList();
       expect(today, [8, 10, 12, 14, 16, 18, 20, 22]);
-      expect(r.first.title, 'Còn 2 việc chưa xong 📝');
+      expect(r.first.title, 'Còn 2 việc chưa xong');
+      expect(r.first.tile, ('CÒN', '2', 'VIỆC'));
     });
 
     test('chỉ nhắc các mốc còn ở tương lai', () {
-      final r = plan(settings: s, todos: [Todo(text: 'A')], at: DateTime(2026, 10, 7, 13, 0));
+      final r = plan(
+        settings: s,
+        todos: [Todo(text: 'A')],
+        at: DateTime(2026, 10, 7, 13, 0),
+      );
       expect(r.first.at, DateTime(2026, 10, 7, 14, 0));
     });
 
     test('không nhắc khi mọi việc đã xong', () {
-      expect(plan(settings: s, todos: [Todo(text: 'A', done: true)]), isEmpty);
+      expect(
+        plan(
+          settings: s,
+          todos: [Todo(text: 'A', done: true)],
+        ),
+        isEmpty,
+      );
     });
 
     test('bước 1.5 giờ', () {
@@ -134,7 +215,16 @@ void main() {
       expect(addMonths(DateTime(2026, 1, 15), -1), DateTime(2025, 12, 15));
     });
     test('JSON khứ hồi', () {
-      final e = Event(title: 'x', date: '2026-10-07', start: '09:00', end: '10:00', repeat: Repeat.weekly, remind: 30, color: 'mint', note: 'n');
+      final e = Event(
+        title: 'x',
+        date: '2026-10-07',
+        start: '09:00',
+        end: '10:00',
+        repeat: Repeat.weekly,
+        remind: 30,
+        color: 'mint',
+        note: 'n',
+      );
       final b = Event.fromJson(e.toJson());
       expect([b.title, b.start, b.end, b.repeat, b.remind, b.color, b.note], ['x', '09:00', '10:00', Repeat.weekly, 30, 'mint', 'n']);
     });

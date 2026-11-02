@@ -108,32 +108,31 @@ class Event {
     return (s, min(e, 24 * 60));
   }
 
-  Event copy() => Event(
-      id: id, title: title, date: date, start: start, end: end, repeat: repeat, remind: remind, color: color, note: note);
+  Event copy() => Event(id: id, title: title, date: date, start: start, end: end, repeat: repeat, remind: remind, color: color, note: note);
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'date': date,
-        'start': start,
-        'end': end,
-        'repeat': repeat.name,
-        'remind': remind,
-        'color': color,
-        'note': note,
-      };
+    'id': id,
+    'title': title,
+    'date': date,
+    'start': start,
+    'end': end,
+    'repeat': repeat.name,
+    'remind': remind,
+    'color': color,
+    'note': note,
+  };
 
   factory Event.fromJson(Map<String, dynamic> j) => Event(
-        id: j['id'] as String?,
-        title: j['title'] as String? ?? '',
-        date: j['date'] as String,
-        start: j['start'] as String?,
-        end: j['end'] as String?,
-        repeat: Repeat.values.firstWhere((r) => r.name == j['repeat'], orElse: () => Repeat.none),
-        remind: j['remind'] as int?,
-        color: j['color'] as String? ?? 'pink',
-        note: j['note'] as String? ?? '',
-      );
+    id: j['id'] as String?,
+    title: j['title'] as String? ?? '',
+    date: j['date'] as String,
+    start: j['start'] as String?,
+    end: j['end'] as String?,
+    repeat: Repeat.values.firstWhere((r) => r.name == j['repeat'], orElse: () => Repeat.none),
+    remind: j['remind'] as int?,
+    color: j['color'] as String? ?? 'pink',
+    note: j['note'] as String? ?? '',
+  );
 }
 
 class Todo {
@@ -148,12 +147,12 @@ class Todo {
   Map<String, dynamic> toJson() => {'id': id, 'text': text, 'done': done, 'due': due, 'prio': prio};
 
   factory Todo.fromJson(Map<String, dynamic> j) => Todo(
-        id: j['id'] as String?,
-        text: j['text'] as String? ?? '',
-        done: j['done'] as bool? ?? false,
-        due: j['due'] as String?,
-        prio: j['prio'] as int? ?? 1,
-      );
+    id: j['id'] as String?,
+    text: j['text'] as String? ?? '',
+    done: j['done'] as bool? ?? false,
+    due: j['due'] as String?,
+    prio: j['prio'] as int? ?? 1,
+  );
 }
 
 class Settings {
@@ -164,6 +163,8 @@ class Settings {
     this.intervalHours = 2.0,
     this.intervalFrom = '08:00',
     this.intervalTo = '22:00',
+    this.pinnedNote = '',
+    this.pinnedOn = false,
   });
 
   bool dailyOn;
@@ -172,30 +173,107 @@ class Settings {
   double intervalHours;
   String intervalFrom;
   String intervalTo;
+  String pinnedNote; // ghi chú hiện trên màn hình khóa
+  bool pinnedOn;
 
   Settings copy() => Settings(
-      dailyOn: dailyOn,
-      dailyTime: dailyTime,
-      intervalOn: intervalOn,
-      intervalHours: intervalHours,
-      intervalFrom: intervalFrom,
-      intervalTo: intervalTo);
+    dailyOn: dailyOn,
+    dailyTime: dailyTime,
+    intervalOn: intervalOn,
+    intervalHours: intervalHours,
+    intervalFrom: intervalFrom,
+    intervalTo: intervalTo,
+    pinnedNote: pinnedNote,
+    pinnedOn: pinnedOn,
+  );
 
   Map<String, dynamic> toJson() => {
-        'dailyOn': dailyOn,
-        'dailyTime': dailyTime,
-        'intervalOn': intervalOn,
-        'intervalHours': intervalHours,
-        'intervalFrom': intervalFrom,
-        'intervalTo': intervalTo,
-      };
+    'dailyOn': dailyOn,
+    'dailyTime': dailyTime,
+    'intervalOn': intervalOn,
+    'intervalHours': intervalHours,
+    'intervalFrom': intervalFrom,
+    'intervalTo': intervalTo,
+    'pinnedNote': pinnedNote,
+    'pinnedOn': pinnedOn,
+  };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
-        dailyOn: j['dailyOn'] as bool? ?? true,
-        dailyTime: j['dailyTime'] as String? ?? '08:00',
-        intervalOn: j['intervalOn'] as bool? ?? false,
-        intervalHours: (j['intervalHours'] as num?)?.toDouble() ?? 2.0,
-        intervalFrom: j['intervalFrom'] as String? ?? '08:00',
-        intervalTo: j['intervalTo'] as String? ?? '22:00',
-      );
+    dailyOn: j['dailyOn'] as bool? ?? true,
+    dailyTime: j['dailyTime'] as String? ?? '08:00',
+    intervalOn: j['intervalOn'] as bool? ?? false,
+    intervalHours: (j['intervalHours'] as num?)?.toDouble() ?? 2.0,
+    intervalFrom: j['intervalFrom'] as String? ?? '08:00',
+    intervalTo: j['intervalTo'] as String? ?? '22:00',
+    pinnedNote: j['pinnedNote'] as String? ?? '',
+    pinnedOn: j['pinnedOn'] as bool? ?? false,
+  );
+}
+
+/// Một khung giờ trong "lịch cố định": lặp lại vào các ngày đã chọn mỗi tuần.
+class RoutineBlock {
+  RoutineBlock({
+    String? id,
+    required this.title,
+    required this.start,
+    required this.end,
+    required this.days,
+    this.color = 'lavender',
+    this.remind = true,
+    this.lockScreen = false,
+  }) : id = id ?? newId();
+
+  final String id;
+  String title;
+  String start; // HH:mm
+  String end; // HH:mm
+  Set<int> days; // 1 = Thứ Hai … 7 = Chủ Nhật
+  String color;
+  bool remind; // nhắc đúng giờ bắt đầu
+  bool lockScreen; // giữ trên màn hình khóa trong suốt khung giờ
+
+  bool occursOn(DateTime d) => days.contains(d.weekday);
+
+  (int, int) get span {
+    final s = hhmmToMin(start);
+    var e = hhmmToMin(end);
+    if (e <= s) e = s + 30;
+    return (s, min(e, 24 * 60));
+  }
+
+  RoutineBlock copy() =>
+      RoutineBlock(id: id, title: title, start: start, end: end, days: {...days}, color: color, remind: remind, lockScreen: lockScreen);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'start': start,
+    'end': end,
+    'days': (days.toList()..sort()),
+    'color': color,
+    'remind': remind,
+    'lockScreen': lockScreen,
+  };
+
+  factory RoutineBlock.fromJson(Map<String, dynamic> j) => RoutineBlock(
+    id: j['id'] as String?,
+    title: j['title'] as String? ?? '',
+    start: j['start'] as String? ?? '09:00',
+    end: j['end'] as String? ?? '10:00',
+    days: {for (final d in (j['days'] as List? ?? const [])) d as int},
+    color: j['color'] as String? ?? 'lavender',
+    remind: j['remind'] as bool? ?? true,
+    lockScreen: j['lockScreen'] as bool? ?? false,
+  );
+}
+
+const weekdayShortVi = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+/// "T2 · T4 · T6", "Mỗi ngày", "Thứ Hai – Thứ Sáu"…
+String describeDays(Set<int> days) {
+  if (days.length == 7) return 'Mỗi ngày';
+  if (days.isEmpty) return 'Chưa chọn ngày';
+  if (days.length == 5 && days.containsAll({1, 2, 3, 4, 5})) return 'Thứ Hai – Thứ Sáu';
+  if (days.length == 2 && days.containsAll({6, 7})) return 'Cuối tuần';
+  return (days.toList()..sort()).map((d) => weekdayShortVi[d - 1]).join(' · ');
 }

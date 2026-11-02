@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
+import 'clay.dart';
+import 'routine_editor.dart';
 
 Future<void> openEventEditor(BuildContext context, AppStore store, {Event? event, DateTime? day, int? minute}) {
-  return Navigator.of(context).push(MaterialPageRoute(
-    fullscreenDialog: true,
-    builder: (_) => EventEditorScreen(store: store, event: event, day: day, minute: minute),
-  ));
+  return Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => EventEditorScreen(store: store, event: event, day: day, minute: minute),
+    ),
+  );
 }
 
 class EventEditorScreen extends StatefulWidget {
@@ -27,8 +31,8 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
   late final TextEditingController _note;
   late DateTime _date;
   late bool _allDay;
-  late TimeOfDay _start;
-  late TimeOfDay _end;
+  late String _start;
+  late String _end;
   late Repeat _repeat;
   late int? _remind;
   late String _color;
@@ -44,15 +48,13 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     _note = TextEditingController(text: e?.note ?? '');
     _date = e?.day ?? dateOnly(widget.day ?? DateTime.now());
     _allDay = e != null && e.start == null;
-    TimeOfDay parse(String s) => TimeOfDay(hour: hhmmToMin(s) ~/ 60, minute: hhmmToMin(s) % 60);
     if (e?.start != null) {
-      _start = parse(e!.start!);
-      _end = parse(e.end ?? minToHhmm(hhmmToMin(e.start!) + 60));
+      _start = e!.start!;
+      _end = e.end ?? minToHhmm(hhmmToMin(e.start!) + 60);
     } else {
       final m = widget.minute ?? 9 * 60;
-      _start = TimeOfDay(hour: m ~/ 60, minute: m % 60);
-      final m2 = (m + 60).clamp(0, 23 * 60 + 59);
-      _end = TimeOfDay(hour: m2 ~/ 60, minute: m2 % 60);
+      _start = minToHhmm(m);
+      _end = minToHhmm(m + 60);
     }
     _repeat = e?.repeat ?? Repeat.none;
     _remind = e == null ? 10 : e.remind;
@@ -65,8 +67,6 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     _note.dispose();
     super.dispose();
   }
-
-  String _fmt(TimeOfDay t) => '${two(t.hour)}:${two(t.minute)}';
 
   Future<void> _pickDate() async {
     final d = await showDatePicker(
@@ -81,15 +81,6 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     if (d != null) setState(() => _date = d);
   }
 
-  Future<TimeOfDay?> _pickTime(TimeOfDay init) => showTimePicker(
-        context: context,
-        initialTime: init,
-        helpText: 'Chọn giờ',
-        cancelText: 'Hủy',
-        confirmText: 'Chọn',
-        builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
-      );
-
   void _save() {
     final title = _title.text.trim();
     if (title.isEmpty) {
@@ -100,8 +91,8 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     ev
       ..title = title
       ..date = isoDate(_date)
-      ..start = _allDay ? null : _fmt(_start)
-      ..end = _allDay ? null : _fmt(_end)
+      ..start = _allDay ? null : _start
+      ..end = _allDay ? null : _end
       ..repeat = _repeat
       ..remind = _remind
       ..color = _color
@@ -114,11 +105,23 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Xóa lịch này?'),
-        content: Text(_repeat == Repeat.none ? 'Lịch sẽ bị xóa vĩnh viễn.' : 'Toàn bộ chuỗi lịch lặp sẽ bị xóa.'),
+        title: Text('Xóa lịch này?', style: ts(18, w: FontWeight.w800)),
+        content: Text(_repeat == Repeat.none ? 'Lịch sẽ bị xóa vĩnh viễn.' : 'Toàn bộ chuỗi lịch lặp sẽ bị xóa.', style: ts(14, c: kMuted)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Xóa', style: TextStyle(color: kDanger))),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: Text(
+              'Hủy',
+              style: ts(14, w: FontWeight.w700, c: kMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: Text(
+              'Xóa',
+              style: ts(14, w: FontWeight.w800, c: kDanger),
+            ),
+          ),
         ],
       ),
     );
@@ -128,147 +131,268 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final dateText = '${weekdayLong[_date.weekday - 1]}, ${two(_date.day)}/${two(_date.month)}/${_date.year}';
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_editing ? '✿ Sửa lịch' : '✿ Thêm lịch mới', style: const TextStyle(fontWeight: FontWeight.w800)),
-        actions: [if (_editing) IconButton(onPressed: _delete, icon: const Icon(Icons.delete_outline_rounded, color: kDanger), tooltip: 'Xóa')],
+  Widget _section({required Widget child, int i = 0}) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: FadeUp(
+      delay: Duration(milliseconds: 50 * i),
+      child: Clay(radius: 24, depth: 0.6, padding: const EdgeInsets.all(14), child: child),
+    ),
+  );
+
+  Widget _timeBox(String label, String value, ValueChanged<String> onPicked) => Expanded(
+    child: Pressable(
+      scale: 0.97,
+      label: '$label $value',
+      onTap: () async {
+        final t = await pickTime(context, value);
+        if (t != null) onPicked(fmtTime(t));
+      },
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: wellDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: ts(12, w: FontWeight.w700, c: kMuted),
+            ),
+            Text(value, style: ts(24, w: FontWeight.w800)),
+          ],
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+    ),
+  );
+
+  Widget _choices<T>(String label, IconData icon, List<(T, String)> options, T value, ValueChanged<T> onChanged) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
         children: [
-          TextField(
-            controller: _title,
-            autofocus: !_editing,
-            textCapitalization: TextCapitalization.sentences,
-            maxLength: 80,
-            onChanged: (_) => _titleError ? setState(() => _titleError = false) : null,
-            decoration: InputDecoration(
-              hintText: 'Tiêu đề: họp nhóm, học tiếng Nhật…',
-              counterText: '',
-              errorText: _titleError ? 'Hãy nhập tiêu đề nhé' : null,
-              prefixIcon: const Icon(Icons.edit_rounded, color: kAccent),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Column(children: [
-              ListTile(
-                leading: const Icon(Icons.event_rounded, color: kAccent),
-                title: Text(dateText, style: const TextStyle(fontWeight: FontWeight.w700)),
-                onTap: _pickDate,
-              ),
-              const Divider(indent: 16, endIndent: 16),
-              SwitchListTile(
-                secondary: const Icon(Icons.wb_sunny_rounded, color: kAccent),
-                title: const Text('Cả ngày', style: TextStyle(fontWeight: FontWeight.w700)),
-                value: _allDay,
-                onChanged: (v) => setState(() => _allDay = v),
-              ),
-              if (!_allDay) ...[
-                const Divider(indent: 16, endIndent: 16),
-                Row(children: [
-                  Expanded(
-                    child: ListTile(
-                      leading: const Icon(Icons.schedule_rounded, color: kAccent),
-                      title: Text(_fmt(_start), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                      subtitle: const Text('Bắt đầu'),
-                      onTap: () async {
-                        final t = await _pickTime(_start);
-                        if (t == null) return;
-                        setState(() {
-                          final dur = (_end.hour * 60 + _end.minute) - (_start.hour * 60 + _start.minute);
-                          _start = t;
-                          final e = (t.hour * 60 + t.minute + (dur > 0 ? dur : 60)).clamp(0, 23 * 60 + 59);
-                          _end = TimeOfDay(hour: e ~/ 60, minute: e % 60);
-                        });
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: ListTile(
-                      title: Text(_fmt(_end), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                      subtitle: const Text('Kết thúc'),
-                      onTap: () async {
-                        final t = await _pickTime(_end);
-                        if (t != null) setState(() => _end = t);
-                      },
-                    ),
-                  ),
-                ]),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Column(children: [
-                DropdownButtonFormField<Repeat>(
-                  initialValue: _repeat,
-                  decoration: const InputDecoration(labelText: 'Lặp lại', prefixIcon: Icon(Icons.repeat_rounded, color: kAccent)),
-                  items: [for (final r in Repeat.values) DropdownMenuItem(value: r, child: Text(r.label))],
-                  onChanged: (v) => setState(() => _repeat = v ?? Repeat.none),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int?>(
-                  initialValue: _remind,
-                  decoration: InputDecoration(
-                    labelText: 'Nhắc nhở',
-                    prefixIcon: const Icon(Icons.notifications_active_rounded, color: kAccent),
-                    helperText: _allDay && _remind != null ? 'Lịch cả ngày sẽ được tính từ 08:00' : null,
-                  ),
-                  items: [for (final e in remindOptions.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-                  onChanged: (v) => setState(() => _remind = v),
-                ),
-              ]),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Màu sắc', style: TextStyle(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 12, runSpacing: 10, children: [
-                  for (final e in palette.entries)
-                    GestureDetector(
-                      onTap: () => setState(() => _color = e.key),
-                      child: Tooltip(
-                        message: e.value.name,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: e.value.bg,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: _color == e.key ? e.value.fg : e.value.bg, width: 3),
-                          ),
-                          child: _color == e.key ? Icon(Icons.check_rounded, color: e.value.fg) : null,
-                        ),
-                      ),
-                    ),
-                ]),
-              ]),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _note,
-            maxLines: 3,
-            maxLength: 300,
-            decoration: const InputDecoration(hintText: 'Ghi chú nhỏ…', prefixIcon: Icon(Icons.notes_rounded, color: kAccent)),
-          ),
+          Icon(icon, size: 17, color: kPrimary),
+          const SizedBox(width: 8),
+          Text(label, style: ts(14, w: FontWeight.w800)),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton.icon(onPressed: _save, icon: const Icon(Icons.check_rounded), label: const Text('Lưu')),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final o in options)
+            Pressable(
+              label: o.$2,
+              onTap: () => onChanged(o.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: o.$1 == value
+                    ? BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [lighten(kPrimary, .15), kPrimary],
+                        ),
+                        boxShadow: clayShadow(kPrimary, depth: 0.5),
+                      )
+                    : wellDecoration(radius: 12),
+                child: Text(
+                  o.$2,
+                  style: ts(13, w: FontWeight.w700, c: o.$1 == value ? Colors.white : kMuted),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = '${weekdayLong[_date.weekday - 1]}, ${_date.day} tháng ${_date.month}, ${_date.year}';
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+              child: Row(
+                children: [
+                  ClayIconButton(icon: Ic.x, label: 'Đóng', onTap: () => Navigator.pop(context)),
+                  Expanded(
+                    child: Text(
+                      _editing ? 'Sửa lịch' : 'Lịch mới',
+                      textAlign: TextAlign.center,
+                      style: ts(19, w: FontWeight.w800),
+                    ),
+                  ),
+                  if (_editing)
+                    ClayIconButton(icon: Ic.trash2, label: 'Xóa lịch', fg: kDanger, onTap: _delete)
+                  else
+                    const SizedBox(width: 44),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                children: [
+                  FadeUp(
+                    child: TextField(
+                      controller: _title,
+                      autofocus: !_editing,
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLength: 80,
+                      style: ts(18, w: FontWeight.w800),
+                      onChanged: (_) => _titleError ? setState(() => _titleError = false) : null,
+                      decoration: InputDecoration(
+                        hintText: 'Tên lịch: họp nhóm, học tiếng Nhật…',
+                        counterText: '',
+                        errorText: _titleError ? 'Hãy nhập tên lịch nhé' : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _section(
+                    i: 1,
+                    child: Column(
+                      children: [
+                        Pressable(
+                          scale: 0.98,
+                          onTap: _pickDate,
+                          label: dateText,
+                          child: Row(
+                            children: [
+                              const IconTile(icon: Ic.calendarDays, color: 'pink', size: 40),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(dateText, style: ts(15, w: FontWeight.w700)),
+                              ),
+                              const Icon(Ic.chevronRight, size: 18, color: kMuted),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const IconTile(icon: Ic.sun, color: 'yellow', size: 40),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text('Cả ngày', style: ts(15, w: FontWeight.w700)),
+                            ),
+                            ClaySwitch(value: _allDay, label: 'Cả ngày', onChanged: (v) => setState(() => _allDay = v)),
+                          ],
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          child: _allDay
+                              ? const SizedBox(width: double.infinity)
+                              : Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Row(
+                                    children: [
+                                      _timeBox(
+                                        'Bắt đầu',
+                                        _start,
+                                        (v) => setState(() {
+                                          final dur = hhmmToMin(_end) - hhmmToMin(_start);
+                                          _start = v;
+                                          _end = minToHhmm(hhmmToMin(v) + (dur > 0 ? dur : 60));
+                                        }),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      _timeBox('Kết thúc', _end, (v) => setState(() => _end = v)),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _section(
+                    i: 2,
+                    child: _choices<int?>(
+                      'Nhắc nhở',
+                      Ic.bellRing,
+                      [for (final e in remindOptions.entries) (e.key, e.value)],
+                      _remind,
+                      (v) => setState(() => _remind = v),
+                    ),
+                  ),
+                  _section(
+                    i: 3,
+                    child: _choices<Repeat>(
+                      'Lặp lại',
+                      Ic.repeat,
+                      [for (final r in Repeat.values) (r, r.label)],
+                      _repeat,
+                      (v) => setState(() => _repeat = v),
+                    ),
+                  ),
+                  _section(
+                    i: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Ic.palette, size: 17, color: kPrimary),
+                            const SizedBox(width: 8),
+                            Text('Màu', style: ts(14, w: FontWeight.w800)),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          runSpacing: 10,
+                          children: [
+                            for (final e in palette.entries)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 10),
+                                child: Pressable(
+                                  label: e.value.name,
+                                  scale: 0.88,
+                                  onTap: () => setState(() => _color = e.key),
+                                  child: AnimatedScale(
+                                    duration: const Duration(milliseconds: 260),
+                                    curve: Curves.easeOutBack,
+                                    scale: _color == e.key ? 1.12 : 1,
+                                    child: Clay(
+                                      color: e.value.bg,
+                                      tint: e.value.fg,
+                                      radius: 14,
+                                      depth: _color == e.key ? 0.8 : 0.3,
+                                      width: 40,
+                                      height: 40,
+                                      child: _color == e.key ? Icon(Ic.check, size: 20, color: e.value.fg) : const SizedBox(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  FadeUp(
+                    delay: const Duration(milliseconds: 250),
+                    child: TextField(
+                      controller: _note,
+                      maxLines: 3,
+                      maxLength: 300,
+                      style: ts(15, w: FontWeight.w500),
+                      decoration: const InputDecoration(hintText: 'Ghi chú nhỏ (hiện trong thông báo)…', counterText: ''),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+              child: ClayButton(label: 'Lưu', icon: Ic.check, expand: true, onTap: _save),
+            ),
+          ],
         ),
       ),
     );

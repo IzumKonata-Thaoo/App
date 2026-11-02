@@ -4,6 +4,12 @@
 
 ## Tính năng
 
+**Bản 2.0** – giao diện mới dạng khối nổi 3D ("đất sét"), font Be Vietnam Pro, icon nét Lucide, hoạt ảnh (thẻ nổi nghiêng 3D, xuất hiện lần lượt, nhịp "đang diễn ra", vòng/thanh tiến độ chạy). Thêm **Lịch cố định**, **ghi chú trên màn hình khóa** và **thông báo đẹp hơn**.
+
+- **Lịch cố định hằng tuần**: khung giờ lặp lại vào các ngày chọn (VD: T2·T4·T6 09:00–10:30 học tiếng Nhật). Bản đồ cả tuần, bật/tắt nhắc từng khung, tùy chọn "Hiện trên màn hình khóa" giữ thông báo suốt khung giờ.
+- **Ghi chú ghim màn hình khóa**: một thông báo luôn hiện (không tự mất) với nội dung bạn viết, có khung xem trước ngay trong app.
+- **Thông báo**: ô màu 3D vẽ riêng cho từng loại (SAU 15 PHÚT, BẮT ĐẦU 09:00, CÒN 3 VIỆC…), màu theo lịch, nút **Đã biết / Nhắc 5 phút / Mở lịch**, tóm tắt buổi sáng dạng danh sách.
+
 - **Lịch Tháng / Tuần / Năm** – chuyển bằng thanh phía trên hoặc vuốt trái/phải để sang kỳ khác.
   - Tháng: lưới ngày có chấm màu, bên dưới là danh sách lịch & việc đến hạn của ngày đang chọn.
   - Tuần: dải 7 ngày + lưới giờ trong ngày (lịch chồng giờ tự chia cột, vạch giờ hiện tại, chạm ô trống để thêm lịch).
@@ -49,7 +55,9 @@ lib/models.dart             Event / Todo / Settings, quy tắc lặp lịch
 lib/store.dart              lưu trữ (shared_preferences) + hẹn lại nhắc nhở mỗi khi dữ liệu đổi
 lib/reminder_planner.dart   tính danh sách thông báo cần hẹn giờ (thuần Dart, có test)
 lib/notifications.dart      hẹn giờ thông báo bằng báo thức hệ thống Android
-lib/ui/                     các màn hình: lịch (tháng/tuần/năm), todo, nhắc nhở, thêm/sửa lịch
+lib/ui/clay.dart            bộ khối 3D dùng chung: thẻ nổi, nút lún, công tắc, vòng tiến độ, hoạt ảnh
+lib/ui/                     các màn hình: lịch (tháng/tuần/năm), việc, lịch cố định, nhắc nhở, thêm/sửa
+assets/fonts/               Be Vietnam Pro (giấy phép SIL OFL, xem OFL.txt)
 test/                       test logic nhắc nhở & giao diện
 desktop/                    bản desktop cũ viết bằng Python + PySide6 (không còn dùng cho Android)
 ```

@@ -1,29 +1,37 @@
 import 'package:flutter/material.dart';
 
-const kBg = Color(0xFFFFF6FA);
-const kInk = Color(0xFF5A4A6A);
-const kMuted = Color(0xFFA596B3);
-const kAccent = Color(0xFFFF8FBA);
-const kAccentSoft = Color(0xFFFFE3EE);
-const kLavender = Color(0xFFB79CED);
-const kGrid = Color(0xFFF6E3EE);
-const kOtherMonth = Color(0xFFFFF0F6);
-const kDanger = Color(0xFFE5658B);
+const kFont = 'BeVietnamPro';
 
+const kBg = Color(0xFFFBF5FA);
+const kInk = Color(0xFF33263F);
+const kMuted = Color(0xFF75688A);
+const kFaint = Color(0xFFB9AEC6);
+const kLine = Color(0xFFEEDDEB);
+const kWell = Color(0xFFF7EEF6); // nền ô nhập / rãnh lõm
+const kTrack = Color(0xFFF1E6F1);
+const kPrimary = Color(0xFFC2417A);
+const kPrimarySoft = Color(0xFFFFE3EE);
+const kViolet = Color(0xFF7A4FD6);
+const kVioletSoft = Color(0xFFECE3FF);
+const kGreen = Color(0xFF2BA36B);
+const kDanger = Color(0xFFB83A6E);
+
+/// Màu pastel: nền khối, chữ/viền đậm, chấm nhỏ đậm vừa.
 class Pastel {
-  const Pastel(this.name, this.bg, this.fg);
+  const Pastel(this.name, this.bg, this.fg, this.dot);
   final String name;
   final Color bg;
   final Color fg;
+  final Color dot;
 }
 
 const palette = <String, Pastel>{
-  'pink': Pastel('Hồng', Color(0xFFFFD1E3), Color(0xFFB8446F)),
-  'peach': Pastel('Cam đào', Color(0xFFFFE0C2), Color(0xFFB5651D)),
-  'yellow': Pastel('Vàng', Color(0xFFFFF3B8), Color(0xFF8A7410)),
-  'mint': Pastel('Bạc hà', Color(0xFFCFF5DC), Color(0xFF2E7D57)),
-  'sky': Pastel('Xanh trời', Color(0xFFC9E6FF), Color(0xFF2F6FA3)),
-  'lavender': Pastel('Tím oải hương', Color(0xFFE3D4FA), Color(0xFF6B4BA8)),
+  'pink': Pastel('Hồng', Color(0xFFFFD3E4), Color(0xFF8E2457), Color(0xFFC2417A)),
+  'peach': Pastel('Cam đào', Color(0xFFFFE0C7), Color(0xFF8A4510), Color(0xFFE07A2E)),
+  'yellow': Pastel('Vàng bơ', Color(0xFFFFF1B8), Color(0xFF6E5A0C), Color(0xFFE0A21E)),
+  'mint': Pastel('Bạc hà', Color(0xFFC8F0DB), Color(0xFF23704C), Color(0xFF2BA36B)),
+  'sky': Pastel('Xanh trời', Color(0xFFCFE6FF), Color(0xFF2B5F96), Color(0xFF2B8FD6)),
+  'lavender': Pastel('Oải hương', Color(0xFFE6DAFF), Color(0xFF5B3FA6), Color(0xFF7A4FD6)),
 };
 
 Pastel pastel(String key) => palette[key] ?? palette['pink']!;
@@ -31,105 +39,83 @@ Pastel pastel(String key) => palette[key] ?? palette['pink']!;
 const weekdayShort = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const weekdayLong = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
+/// Bóng đổ "đất sét" cho khối nổi.
+List<BoxShadow> clayShadow(Color tint, {double depth = 1}) => [
+  BoxShadow(
+    color: tint.withValues(alpha: 0.30 * depth),
+    blurRadius: 26 * depth,
+    spreadRadius: -10,
+    offset: Offset(0, 16 * depth),
+  ),
+  BoxShadow(
+    color: tint.withValues(alpha: 0.10 * depth),
+    blurRadius: 6,
+    offset: const Offset(0, 2),
+  ),
+];
+
+const kShadowTint = Color(0xFF784A8A);
+
+TextStyle ts(double size, {FontWeight w = FontWeight.w600, Color c = kInk, double? h, double? ls, TextDecoration? deco}) => TextStyle(
+  fontFamily: kFont,
+  fontSize: size,
+  fontWeight: w,
+  color: c,
+  height: h,
+  letterSpacing: ls,
+  decoration: deco,
+  decorationColor: c,
+);
+
 ThemeData buildTheme() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: kAccent,
+    seedColor: kPrimary,
     brightness: Brightness.light,
-    primary: kAccent,
+    primary: kPrimary,
     onPrimary: Colors.white,
-    secondary: kLavender,
+    secondary: kViolet,
     surface: kBg,
     onSurface: kInk,
   );
-  OutlineInputBorder border(Color c, [double w = 1.5]) =>
-      OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c, width: w));
-  return ThemeData(
-    useMaterial3: true,
-    colorScheme: scheme,
+  final base = ThemeData(useMaterial3: true, fontFamily: kFont, colorScheme: scheme);
+  return base.copyWith(
     scaffoldBackgroundColor: kBg,
-    textTheme: ThemeData.light().textTheme.apply(bodyColor: kInk, displayColor: kInk),
-    appBarTheme: const AppBarTheme(
-        backgroundColor: kBg, foregroundColor: kInk, elevation: 0, scrolledUnderElevation: 0, centerTitle: false),
-    cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: kGrid)),
-    ),
+    textTheme: base.textTheme.apply(bodyColor: kInk, displayColor: kInk, fontFamily: kFont),
+    splashFactory: InkSparkle.splashFactory,
+    appBarTheme: const AppBarTheme(backgroundColor: kBg, foregroundColor: kInk, elevation: 0, scrolledUnderElevation: 0),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: border(kGrid),
-      enabledBorder: border(kGrid),
-      focusedBorder: border(kAccent, 2),
-      hintStyle: const TextStyle(color: kMuted),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: kAccent,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      fillColor: kWell,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: kPrimary, width: 2),
       ),
+      hintStyle: ts(15, c: kMuted, w: FontWeight.w500),
+      labelStyle: ts(14, c: kMuted),
     ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: kInk,
-        side: const BorderSide(color: kGrid, width: 1.5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-    floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: kAccent,
-      foregroundColor: Colors.white,
-      elevation: 3,
-      focusElevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide.none),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
+    dialogTheme: DialogThemeData(
       backgroundColor: Colors.white,
-      indicatorColor: kAccentSoft,
-      surfaceTintColor: Colors.transparent,
-      labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
-          fontSize: 12, fontWeight: FontWeight.w700, color: s.contains(WidgetState.selected) ? kAccent : kMuted)),
-      iconTheme: WidgetStateProperty.resolveWith(
-          (s) => IconThemeData(color: s.contains(WidgetState.selected) ? kAccent : kMuted)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
-    switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : kMuted),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kAccent : kGrid),
-      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-    ),
-    checkboxTheme: CheckboxThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      side: const BorderSide(color: Color(0xFFE8C9DA), width: 2),
-      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kAccent : Colors.white),
-    ),
-    sliderTheme: const SliderThemeData(
-        activeTrackColor: kAccent, inactiveTrackColor: kGrid, thumbColor: kAccent, overlayColor: Color(0x33FF8FBA)),
-    segmentedButtonTheme: SegmentedButtonThemeData(
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : const Color(0xFFF9E8F1)),
-        foregroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kAccent : kMuted),
-        side: const WidgetStatePropertyAll(BorderSide.none),
-        textStyle: const WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w800)),
-      ),
-    ),
-    chipTheme: ChipThemeData(
+    bottomSheetTheme: const BottomSheetThemeData(backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
+    datePickerTheme: DatePickerThemeData(
       backgroundColor: Colors.white,
-      selectedColor: kAccentSoft,
-      side: const BorderSide(color: kGrid),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700, color: kInk),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      headerBackgroundColor: kPrimary,
+      headerForegroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
-    dividerTheme: const DividerThemeData(color: kGrid, space: 1),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    ),
     snackBarTheme: SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: kInk,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: kInk,
+      contentTextStyle: ts(14, c: Colors.white),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {TargetPlatform.android: FadeForwardsPageTransitionsBuilder()}),
   );
 }

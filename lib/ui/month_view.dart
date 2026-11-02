@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
+import 'clay.dart';
 import 'widgets.dart';
 
 class MonthGrid extends StatelessWidget {
@@ -15,117 +16,177 @@ class MonthGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final first = DateTime(current.year, current.month, 1);
     final offset = first.weekday - 1;
-    final rows = ((offset + daysInMonth(current.year, current.month)) / 7).ceil();
-    final start = first.subtract(Duration(days: offset));
+    final days = daysInMonth(current.year, current.month);
+    final rows = ((offset + days) / 7).ceil();
     final today = dateOnly(DateTime.now());
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [
-          for (var i = 0; i < 7; i++)
-            Expanded(
-              child: Center(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < 7; i++)
+              Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(weekdayShort[i],
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: i == 6 ? kDanger : kMuted)),
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    weekdayShort[i],
+                    textAlign: TextAlign.center,
+                    style: ts(11, w: FontWeight.w700, c: i == 6 ? kDanger : kMuted),
+                  ),
                 ),
               ),
-            ),
-        ]),
+          ],
+        ),
         for (var r = 0; r < rows; r++)
-          Row(children: [
-            for (var c = 0; c < 7; c++)
-              Expanded(child: _cell(start.add(Duration(days: r * 7 + c)), today)),
-          ]),
-      ]),
+          Row(
+            children: [
+              for (var c = 0; c < 7; c++)
+                Expanded(
+                  child: Builder(
+                    builder: (_) {
+                      final n = r * 7 + c - offset + 1;
+                      if (n < 1 || n > days) return const SizedBox(height: 44);
+                      final d = DateTime(current.year, current.month, n);
+                      return _DayCell(
+                        day: d,
+                        today: d == today,
+                        selected: d == current,
+                        marks: dotsFor(store, d),
+                        onTap: () => onSelect(d),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+      ],
     );
   }
+}
 
-  Widget _cell(DateTime d, DateTime today) {
-    final inMonth = d.month == current.month;
-    final isToday = d == today;
-    final selected = d == current;
-    final events = store.eventsOn(d);
-    final todos = store.todosDueOn(d).length;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onSelect(d),
-      child: Container(
-        height: 54,
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: inMonth ? Colors.white : kOtherMonth,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? kLavender : (isToday ? kAccent : kGrid), width: selected ? 2 : 1),
-        ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: isToday ? kAccent : null, shape: BoxShape.circle),
-            child: Text('${d.day}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: isToday
-                      ? Colors.white
-                      : d.weekday == 7
-                          ? (inMonth ? kDanger : const Color(0xFFEBBCCB))
-                          : (inMonth ? kInk : const Color(0xFFCDBBD6)),
-                )),
+class _DayCell extends StatelessWidget {
+  const _DayCell({required this.day, required this.today, required this.selected, required this.marks, required this.onTap});
+  final DateTime day;
+  final bool today;
+  final bool selected;
+  final List<Color> marks;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = '${day.day}';
+    Widget number;
+    if (today) {
+      number = Loop(
+        period: const Duration(milliseconds: 1300),
+        child: Clay(
+          color: kPrimary,
+          tint: kPrimary,
+          radius: 11,
+          depth: 0.7,
+          width: 32,
+          height: 32,
+          child: Center(
+            child: Text(
+              label,
+              style: ts(13, w: FontWeight.w800, c: Colors.white),
+            ),
           ),
-          const SizedBox(height: 3),
-          SizedBox(height: 7, child: dayDots(events, todos)),
-        ]),
+        ),
+        builder: (_, t, c) => Transform.translate(offset: Offset(0, -3 * t), child: c),
+      );
+    } else if (selected) {
+      number = Clay(
+        radius: 11,
+        depth: 0.5,
+        width: 32,
+        height: 32,
+        child: Center(
+          child: Text(
+            label,
+            style: ts(13, w: FontWeight.w800, c: kPrimary),
+          ),
+        ),
+      );
+    } else {
+      number = SizedBox(
+        width: 32,
+        height: 32,
+        child: Center(
+          child: Text(
+            label,
+            style: ts(13, w: FontWeight.w600, c: day.weekday == 7 ? kDanger : kInk),
+          ),
+        ),
+      );
+    }
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: fullDate(day),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          height: 44,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              number,
+              const SizedBox(height: 2),
+              SizedBox(height: 5, child: today ? null : dots(marks)),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Danh sách lịch & việc đến hạn của một ngày.
+/// Danh sách mục của một ngày (lịch, khung giờ cố định, việc đến hạn).
 class DayAgenda extends StatelessWidget {
-  const DayAgenda({super.key, required this.store, required this.day, required this.onEdit});
+  const DayAgenda({super.key, required this.store, required this.day, required this.onEditEvent, required this.onEditRoutine});
   final AppStore store;
   final DateTime day;
-  final ValueChanged<Event> onEdit;
+  final ValueChanged<Event> onEditEvent;
+  final ValueChanged<RoutineBlock> onEditRoutine;
 
   @override
   Widget build(BuildContext context) {
-    final events = store.eventsOn(day);
-    final todos = store.todosDueOn(day);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 96),
+    final items = itemsOn(store, day);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(children: [
-          Text(dayLabel(day), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          const Spacer(),
-          if (events.isNotEmpty || todos.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(color: kAccentSoft, borderRadius: BorderRadius.circular(10)),
-              child: Text('${events.length + todos.length}',
-                  style: const TextStyle(color: kAccent, fontWeight: FontWeight.w800)),
-            ),
-        ]),
-        const SizedBox(height: 8),
-        if (events.isEmpty && todos.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: Text('Không có gì cả~ thư giãn nhé ☕', style: TextStyle(color: kMuted))),
-          ),
-        for (final e in events) Padding(padding: const EdgeInsets.only(bottom: 8), child: EventTile(event: e, onTap: () => onEdit(e))),
-        if (todos.isNotEmpty) const SectionLabel('VIỆC ĐẾN HẠN'),
-        for (final t in todos)
-          Card(
-            child: CheckboxListTile(
-              value: t.done,
-              onChanged: (v) => store.setTodoDone(t.id, v ?? false),
-              controlAffinity: ListTileControlAffinity.leading,
-              title: Text(t.text, style: const TextStyle(fontWeight: FontWeight.w700)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        SectionTitle(
+          dayLabel(day),
+          trailing: items.isEmpty
+              ? null
+              : Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(color: kPrimarySoft, borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    '${items.length} mục',
+                    style: ts(12, w: FontWeight.w800, c: kPrimary),
+                  ),
+                ),
+        ),
+        if (items.isEmpty) const EmptyNote('Ngày trống — thư giãn chút nhé', icon: Ic.coffee),
+        for (var i = 0; i < items.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: FadeUp(
+              key: ValueKey('${isoDate(day)}-${items[i].title}-$i'),
+              delay: Duration(milliseconds: 60 * i),
+              child: ItemTile(
+                item: items[i],
+                onTap: switch (items[i].kind) {
+                  ItemKind.event => () => onEditEvent(items[i].event!),
+                  ItemKind.routine => () => onEditRoutine(items[i].routine!),
+                  ItemKind.todo => () => store.setTodoDone(items[i].todo!.id, !items[i].todo!.done),
+                },
+                onToggle: (v) => store.setTodoDone(items[i].todo!.id, v),
+              ),
             ),
           ),
       ],
