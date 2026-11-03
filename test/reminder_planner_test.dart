@@ -61,7 +61,7 @@ void main() {
       );
       // 7/10 là Thứ Tư; lịch gốc thứ Năm → 8/10, 15/10, 22/10, 29/10, 5/11
       expect(r.map((e) => e.at.day).take(3), [8, 15, 22]);
-      expect(r.length, greaterThanOrEqualTo(4));
+      expect(r.length, greaterThanOrEqualTo(3));
     });
   });
 
@@ -123,7 +123,7 @@ void main() {
         todos: [Todo(text: 'Mua sữa')],
       );
       final daily = r.where((e) => e.kind == 'daily').toList();
-      expect(daily.length, 14);
+      expect(daily.length, 7);
       expect(daily.first.at, DateTime(2026, 10, 7, 7, 30));
       expect(daily.first.body, contains('1 lịch, 0 khung giờ cố định và 1 việc chưa xong'));
       expect(daily.first.lines.first, '09:00   Họp');

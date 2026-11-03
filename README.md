@@ -64,4 +64,4 @@ desktop/                    bản desktop cũ viết bằng Python + PySide6 (kh
 
 ## Lưu ý về nhắc nhở
 
-Android hẹn sẵn thông báo cho **31 ngày tới** (lịch), **14 ngày** (nhắc mỗi ngày) và **7 ngày** (nhắc việc chưa xong). Mỗi lần mở app hoặc thay đổi dữ liệu, danh sách được tính lại. Nếu không mở app quá lâu, các nhắc nhở định kỳ có thể hết hạn hẹn trước; chỉ cần mở lại app là tiếp tục.
+Android hẹn sẵn thông báo cho **21 ngày tới** (lịch & khung giờ cố định), **7 ngày** (nhắc mỗi ngày) và **3 ngày** (nhắc việc chưa xong). Mỗi lần mở app hoặc thay đổi dữ liệu, danh sách được tính lại. Nếu không mở app quá lâu, các nhắc nhở định kỳ có thể hết hạn hẹn trước; chỉ cần mở lại app là tiếp tục.

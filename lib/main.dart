@@ -39,6 +39,17 @@ class MochiApp extends StatelessWidget {
       title: 'Mochi Planner',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      // "Hiệu ứng chuyển động" tắt → coi như hệ thống yêu cầu giảm chuyển động.
+      builder: (context, child) => ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          final mq = MediaQuery.of(context);
+          return MediaQuery(
+            data: mq.copyWith(disableAnimations: mq.disableAnimations || !store.settings.motion),
+            child: child!,
+          );
+        },
+      ),
       locale: const Locale('vi', 'VN'),
       supportedLocales: const [Locale('vi', 'VN')],
       localizationsDelegates: const [
@@ -123,10 +134,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             child: IndexedStack(
               index: _tab,
               children: [
-                CalendarTab(key: _calendar, store: widget.store),
-                TodoTab(key: _todo, store: widget.store),
-                RoutineTab(store: widget.store),
-                ReminderTab(store: widget.store),
+                // Tab đang ẩn: tắt bộ đếm khung hình để hiệu ứng không chạy ngầm.
+                for (final (i, tab) in [
+                  CalendarTab(key: _calendar, store: widget.store),
+                  TodoTab(key: _todo, store: widget.store),
+                  RoutineTab(store: widget.store),
+                  ReminderTab(store: widget.store),
+                ].indexed)
+                  TickerMode(enabled: i == _tab, child: tab),
               ],
             ),
           ),

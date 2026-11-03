@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ảnh ô thông báo được gọi theo tên lúc chạy: giữ lại khi thu gọn tài nguyên. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@drawable/tile_*,@drawable/ic_stat_notify" />

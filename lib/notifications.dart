@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -5,7 +6,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'reminder_planner.dart';
@@ -36,8 +36,10 @@ class NotificationService {
   bool _ready = false;
   bool _busy = false;
   bool _again = false;
-  Future<void>? _running;
   AppStore? _latest;
+  Timer? _debounce;
+  Completer<void>? _waiting;
+  String? _lastSig; // lịch nhắc đã áp dụng trong phiên này (bỏ qua nếu không đổi)
   final _tiles = <String, Uint8List>{};
 
   AndroidFlutterLocalNotificationsPlugin? get _android =>
@@ -46,8 +48,8 @@ class NotificationService {
   static const _init = InitializationSettings(android: AndroidInitializationSettings('ic_stat_notify'));
 
   Future<void> init() async {
-    tzdata.initializeTimeZones();
-    tz.setLocalLocation(tz.UTC); // chỉ dùng thời điểm tuyệt đối (epoch), không cần múi giờ
+    // Chỉ dùng thời điểm tuyệt đối (epoch) theo UTC → không cần nạp cơ sở dữ liệu múi giờ (mở app nhanh hơn).
+    tz.setLocalLocation(tz.UTC);
     await _plugin.initialize(
       settings: _init,
       onDidReceiveNotificationResponse: handleAction,
@@ -83,7 +85,7 @@ class NotificationService {
       final p = jsonDecode(r.payload!) as Map<String, dynamic>;
       final plugin = FlutterLocalNotificationsPlugin();
       await plugin.initialize(settings: _init);
-      tzdata.initializeTimeZones();
+      tz.setLocalLocation(tz.UTC);
       final at = DateTime.now().add(const Duration(minutes: 5));
       final color = palette[p['c']]?.fg ?? kPrimary;
       await plugin.zonedSchedule(
@@ -127,9 +129,18 @@ class NotificationService {
   Future<int> pendingCount() async => (await _plugin.pendingNotificationRequests()).length;
 
   // ---------------------------------------------------------------- hiển thị
-  Future<NotificationDetails> _details(PlannedReminder r) async {
+  static String _glyph(String kind) => switch (kind) {
+    'routine' => 'repeat',
+    'daily' => 'sun',
+    'interval' => 'check',
+    _ => 'bell',
+  };
+
+  /// [live]: thông báo hiện ngay → vẽ ô có chữ; thông báo hẹn giờ → dùng ảnh có sẵn trong app
+  /// (plugin lưu mọi thông báo hẹn giờ thành JSON, nhúng ảnh vào sẽ rất nặng và gây giật).
+  Future<NotificationDetails> _details(PlannedReminder r, {bool live = false}) async {
     final p = pastel(r.color);
-    final tile = await _tile(r.color, r.tile);
+    final tile = live ? await _tile(r.color, r.tile) : null;
     final actions = switch (r.kind) {
       'event' => const [
         AndroidNotificationAction(_actAck, 'Đã biết', cancelNotification: true),
@@ -165,7 +176,9 @@ class NotificationService {
         category: AndroidNotificationCategory.reminder,
         icon: 'ic_stat_notify',
         color: p.fg,
-        largeIcon: tile != null ? ByteArrayAndroidBitmap(tile) : null,
+        largeIcon: tile != null
+            ? ByteArrayAndroidBitmap(tile)
+            : DrawableResourceAndroidBitmap('tile_${palette.containsKey(r.color) ? r.color : 'pink'}_${_glyph(r.kind)}'),
         styleInformation: style,
         subText: r.subText,
         visibility: NotificationVisibility.public,
@@ -249,6 +262,7 @@ class NotificationService {
       body: body,
       notificationDetails: await _details(
         PlannedReminder(DateTime.now(), title, body, 'event', color: 'pink', tile: ('', 'NGAY', 'BÂY GIỜ'), subText: 'Thông báo thử'),
+        live: true,
       ),
       payload: jsonEncode({'t': title, 'b': body, 'c': 'pink'}),
     );
@@ -301,7 +315,7 @@ class NotificationService {
           priority: Priority.low,
           icon: 'ic_stat_notify',
           color: pastel('yellow').fg,
-          largeIcon: await _tile('yellow', ('GHI', 'CHÚ', 'GHIM')).then((b) => b != null ? ByteArrayAndroidBitmap(b) : null),
+          largeIcon: const DrawableResourceAndroidBitmap('tile_yellow_pin'),
           ongoing: true,
           autoCancel: false,
           onlyAlertOnce: true,
@@ -315,41 +329,56 @@ class NotificationService {
     );
   }
 
-  /// Hẹn lại toàn bộ nhắc nhở theo dữ liệu hiện tại. Gọi liên tiếp sẽ được gộp lại.
+  /// Hẹn lại toàn bộ nhắc nhở theo dữ liệu hiện tại.
+  /// Các thay đổi liên tiếp (tick việc, gõ ghi chú…) được gộp lại sau 0,8 giây, và nếu
+  /// lịch nhắc không đổi thì bỏ qua — tránh làm việc nặng trên luồng giao diện.
   Future<void> reschedule(AppStore store) {
     if (!_ready) return Future.value();
     _latest = store;
+    final waiting = _waiting ??= Completer<void>();
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 800), _run);
+    return waiting.future;
+  }
+
+  Future<void> _run() async {
     if (_busy) {
       _again = true;
-      return _running ?? Future.value();
+      return;
     }
     _busy = true;
-    _running = () async {
-      try {
-        do {
-          _again = false;
-          final s = _latest!;
-          final plan = planReminders(
-            events: s.events.map((e) => e.copy()).toList(),
-            todos: List.of(s.todos),
-            routines: s.routines.map((r) => r.copy()).toList(),
-            settings: s.settings.copy(),
-            now: DateTime.now(),
-          );
-          await _plugin.cancelAllPendingNotifications();
-          final exact = await exactAlarmsAllowed();
-          var id = 1;
-          for (final r in plan) {
-            await _schedule(id++, r, exact);
-          }
-          await updatePinned(s);
-        } while (_again);
-      } catch (e, st) {
-        debugPrint('reschedule lỗi: $e\n$st');
-      } finally {
-        _busy = false;
-      }
-    }();
-    return _running!;
+    final done = _waiting;
+    _waiting = null;
+    try {
+      do {
+        _again = false;
+        final s = _latest!;
+        final plan = planReminders(
+          events: s.events.map((e) => e.copy()).toList(),
+          todos: List.of(s.todos),
+          routines: s.routines.map((r) => r.copy()).toList(),
+          settings: s.settings.copy(),
+          now: DateTime.now(),
+        );
+        final sig = [
+          for (final r in plan) '${r.at.millisecondsSinceEpoch}|${r.kind}|${r.color}|${r.title}|${r.body}|${r.ongoingFor?.inSeconds}',
+          'pin:${s.settings.pinnedOn}:${s.settings.pinnedNote}',
+        ].join('\n');
+        if (sig == _lastSig) continue;
+        await _plugin.cancelAllPendingNotifications();
+        final exact = await exactAlarmsAllowed();
+        var id = 1;
+        for (final r in plan) {
+          await _schedule(id++, r, exact);
+        }
+        await updatePinned(s);
+        _lastSig = sig;
+      } while (_again);
+    } catch (e, st) {
+      debugPrint('reschedule lỗi: $e\n$st');
+    } finally {
+      _busy = false;
+      done?.complete();
+    }
   }
 }

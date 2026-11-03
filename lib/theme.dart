@@ -39,18 +39,13 @@ Pastel pastel(String key) => palette[key] ?? palette['pink']!;
 const weekdayShort = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const weekdayLong = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
-/// Bóng đổ "đất sét" cho khối nổi.
+/// Bóng đổ "đất sét" cho khối nổi. Một lớp bóng, độ nhòe vừa phải (nhòe lớn rất tốn GPU khi cuộn).
 List<BoxShadow> clayShadow(Color tint, {double depth = 1}) => [
   BoxShadow(
-    color: tint.withValues(alpha: 0.30 * depth),
-    blurRadius: 26 * depth,
-    spreadRadius: -10,
-    offset: Offset(0, 16 * depth),
-  ),
-  BoxShadow(
-    color: tint.withValues(alpha: 0.10 * depth),
-    blurRadius: 6,
-    offset: const Offset(0, 2),
+    color: tint.withValues(alpha: (0.26 * depth).clamp(0, 0.4)),
+    blurRadius: (14 * depth).clamp(4, 18),
+    spreadRadius: -6,
+    offset: Offset(0, (9 * depth).clamp(2, 12)),
   ),
 ];
 

@@ -65,10 +65,10 @@ List<PlannedReminder> planReminders({
   List<RoutineBlock> routines = const [],
   required Settings settings,
   required DateTime now,
-  int eventDays = 31,
-  int dailyDays = 14,
-  int intervalDays = 7,
-  int maxTotal = 400,
+  int eventDays = 21,
+  int dailyDays = 7,
+  int intervalDays = 3,
+  int maxTotal = 150,
 }) {
   final out = <PlannedReminder>[];
   final today = dateOnly(now);

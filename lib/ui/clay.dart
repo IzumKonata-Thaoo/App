@@ -248,17 +248,20 @@ class FadeUp extends StatefulWidget {
 }
 
 class _FadeUpState extends State<FadeUp> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
   late final _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+  late final _slide = Tween(begin: Offset(0, widget.offset / 200), end: Offset.zero).animate(_a);
   Timer? _t;
 
   @override
   void initState() {
     super.initState();
-    if (widget.delay == Duration.zero) {
+    // Chỉ hiệu ứng ở lần hiện đầu; độ trễ tối đa 240ms để danh sách dài không phải chờ.
+    final delay = widget.delay > const Duration(milliseconds: 240) ? const Duration(milliseconds: 240) : widget.delay;
+    if (delay == Duration.zero) {
       _c.forward();
     } else {
-      _t = Timer(widget.delay, _c.forward);
+      _t = Timer(delay, _c.forward);
     }
   }
 
@@ -272,13 +275,10 @@ class _FadeUpState extends State<FadeUp> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (reduceMotion(context)) return widget.child;
-    return AnimatedBuilder(
-      animation: _a,
-      child: widget.child,
-      builder: (_, child) => Opacity(
-        opacity: _a.value,
-        child: Transform.translate(offset: Offset(0, widget.offset * (1 - _a.value)), child: child),
-      ),
+    // FadeTransition/SlideTransition chạy ở tầng layer: không dựng lại cây con mỗi khung hình.
+    return FadeTransition(
+      opacity: _a,
+      child: SlideTransition(position: _slide, child: widget.child),
     );
   }
 }
@@ -313,11 +313,14 @@ class _LoopState extends State<Loop> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  // RepaintBoundary: phần đang chuyển động được vẽ lại riêng, không kéo cả màn hình vẽ lại theo.
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _c,
-    child: widget.child,
-    builder: (ctx, child) => widget.builder(ctx, Curves.easeInOut.transform(_c.value), child),
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: AnimatedBuilder(
+      animation: _c,
+      child: widget.child == null ? null : RepaintBoundary(child: widget.child),
+      builder: (ctx, child) => widget.builder(ctx, Curves.easeInOut.transform(_c.value), child),
+    ),
   );
 }
 

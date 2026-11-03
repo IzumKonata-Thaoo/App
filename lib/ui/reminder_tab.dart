@@ -272,6 +272,20 @@ class _ReminderTabState extends State<ReminderTab> with WidgetsBindingObserver {
                 ),
               ),
               _card(
+                delay: const Duration(milliseconds: 220),
+                child: _head(
+                  Ic.sparkles,
+                  'mint',
+                  'Hiệu ứng chuyển động',
+                  s.motion ? 'Thẻ nổi, nhịp, trôi… Tắt nếu máy chạy chậm' : 'Đang tắt để app chạy nhẹ hơn',
+                  trailing: ClaySwitch(
+                    value: s.motion,
+                    label: 'Hiệu ứng chuyển động',
+                    onChanged: (v) => widget.store.updateSettings((x) => x.motion = v),
+                  ),
+                ),
+              ),
+              _card(
                 delay: const Duration(milliseconds: 240),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

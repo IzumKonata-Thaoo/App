@@ -165,6 +165,7 @@ class Settings {
     this.intervalTo = '22:00',
     this.pinnedNote = '',
     this.pinnedOn = false,
+    this.motion = true,
   });
 
   bool dailyOn;
@@ -175,6 +176,7 @@ class Settings {
   String intervalTo;
   String pinnedNote; // ghi chú hiện trên màn hình khóa
   bool pinnedOn;
+  bool motion; // hiệu ứng chuyển động lặp (tắt cho máy yếu)
 
   Settings copy() => Settings(
     dailyOn: dailyOn,
@@ -185,6 +187,7 @@ class Settings {
     intervalTo: intervalTo,
     pinnedNote: pinnedNote,
     pinnedOn: pinnedOn,
+    motion: motion,
   );
 
   Map<String, dynamic> toJson() => {
@@ -196,6 +199,7 @@ class Settings {
     'intervalTo': intervalTo,
     'pinnedNote': pinnedNote,
     'pinnedOn': pinnedOn,
+    'motion': motion,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -207,6 +211,7 @@ class Settings {
     intervalTo: j['intervalTo'] as String? ?? '22:00',
     pinnedNote: j['pinnedNote'] as String? ?? '',
     pinnedOn: j['pinnedOn'] as bool? ?? false,
+    motion: j['motion'] as bool? ?? true,
   );
 }
 
